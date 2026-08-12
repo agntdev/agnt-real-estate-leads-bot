@@ -162,6 +162,14 @@ composer.command("leads", async (ctx) => {
   await showList(ctx, 0, false);
 });
 
+// Owners see this shortcut on /start. Keep it on the same renderer as /leads
+// so pagination, details, and status controls always behave identically.
+composer.callbackQuery("view_leads", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  if (!(await requireLeadOwner(ctx))) return;
+  await showList(ctx, 0, true);
+});
+
 composer.callbackQuery("lead:start", async (ctx) => {
   await ctx.answerCallbackQuery();
   startDraft(ctx);

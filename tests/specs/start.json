@@ -12,5 +12,19 @@
         ]
       }
     ]
+  },
+  {
+    "name": "a non-owner cannot open leads from the owner start shortcut",
+    "steps": [
+      {
+        "send": { "callback": "view_leads" },
+        "expect": [
+          {
+            "method": "sendMessage",
+            "payload": { "text": "Owner access isn't set up yet." }
+          }
+        ]
+      }
+    ]
   }
 ]
