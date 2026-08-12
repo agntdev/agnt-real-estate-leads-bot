@@ -51,6 +51,17 @@ interface Reminder {
   text: string;
 }
 
+interface StoredLead {
+  id: string;
+  submitter_telegram_id?: number;
+  name: string;
+  phone: string;
+  intent: "Buy" | "Rent" | "Sell";
+  note: string;
+  status: "New" | "Done";
+  timestamp: string;
+}
+
 /**
  * createDurableSessionStorage — a grammY StorageAdapter that routes each session
  * key to its own ChatDO instance. Pass to buildBot({ storage }) in the Worker.
@@ -152,6 +163,52 @@ export class ChatDO {
       await this.state.storage.put("reminders", list);
       await this.rearm(list);
       return new Response(null, { status: 204 });
+    }
+
+    // Lead records live in one dedicated Durable Object. The explicit index
+    // keeps pagination O(page size) and avoids any Redis/Durable Object scan.
+    if (url.pathname === "/leads" && request.method === "POST") {
+      const lead = (await request.json()) as StoredLead;
+      if (!lead.id || !lead.name || !lead.phone || !lead.intent || !lead.note) {
+        return new Response("invalid lead", { status: 400 });
+      }
+      await this.state.storage.put(`lead:${lead.id}`, lead);
+      const ids = (await this.state.storage.get<string[]>("lead-index")) ?? [];
+      if (!ids.includes(lead.id)) {
+        ids.unshift(lead.id);
+        await this.state.storage.put("lead-index", ids);
+      }
+      return Response.json(lead, { status: 201 });
+    }
+
+    if (url.pathname === "/leads" && request.method === "GET") {
+      const page = Math.max(0, Number.parseInt(url.searchParams.get("page") ?? "0", 10) || 0);
+      const perPage = Math.min(10, Math.max(1, Number.parseInt(url.searchParams.get("per_page") ?? "10", 10) || 10));
+      const ids = (await this.state.storage.get<string[]>("lead-index")) ?? [];
+      const selected = ids.slice(page * perPage, (page + 1) * perPage);
+      const leads: StoredLead[] = [];
+      for (const id of selected) {
+        const lead = await this.state.storage.get<StoredLead>(`lead:${id}`);
+        if (lead) leads.push(lead);
+      }
+      return Response.json({ leads, total: ids.length });
+    }
+
+    const leadMatch = /^\/leads\/([^/]+)$/.exec(url.pathname);
+    if (leadMatch) {
+      const key = `lead:${decodeURIComponent(leadMatch[1])}`;
+      const lead = await this.state.storage.get<StoredLead>(key);
+      if (!lead) return new Response("not found", { status: 404 });
+      if (request.method === "GET") return Response.json(lead);
+      if (request.method === "PATCH") {
+        const body = (await request.json()) as { status?: StoredLead["status"] };
+        if (body.status !== "New" && body.status !== "Done") {
+          return new Response("invalid status", { status: 400 });
+        }
+        lead.status = body.status;
+        await this.state.storage.put(key, lead);
+        return Response.json(lead);
+      }
     }
 
     return new Response("not found", { status: 404 });
