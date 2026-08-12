@@ -1,19 +1,56 @@
 [
   {
-    "name": "/leads",
+    "name": "/leads is unavailable until the owner id is configured",
     "steps": [
       {
-        "expect": [
-          {
-            "method": "sendMessage",
-            "payload": {
-              "text": "Access private lead list (owner-only)"
-            }
-          }
-        ],
-        "send": {
-          "text": "/leads"
-        }
+        "send": { "text": "/leads" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "Owner access isn't set up yet." } }]
+      }
+    ]
+  },
+  {
+    "name": "lead form validates a phone number and reaches confirmation",
+    "steps": [
+      {
+        "send": { "text": "/start" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "Welcome. Submit your real estate enquiry below." } }]
+      },
+      {
+        "send": { "callback": "lead:start" },
+        "expect": [{ "method": "editMessageText", "payload": { "text": "Share your full name." } }]
+      },
+      {
+        "send": { "text": "Jordan Lee" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "Share a phone number, including the country code." } }]
+      },
+      {
+        "send": { "text": "not a phone" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "That phone number isn't valid. Send a number with at least seven digits." } }]
+      },
+      {
+        "send": { "text": "+1 555 123 4567" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "Choose the type of enquiry." } }]
+      },
+      {
+        "send": { "callback": "lead:intent:buy" },
+        "expect": [{ "method": "editMessageText", "payload": { "text": "Add a short note about what you need." } }]
+      },
+      {
+        "send": { "text": "Looking for a two-bedroom home near the station." },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "Please confirm your details:\n\nName: Jordan Lee\nPhone: +15551234567\nIntent: Buy\nNote: Looking for a two-bedroom home near the station." } }]
+      },
+      {
+        "send": { "callback": "lead:confirm" },
+        "expect": [{ "method": "editMessageText", "payload": { "text": "Your enquiry couldn't be saved. Please try again shortly." } }]
+      }
+    ]
+  },
+  {
+    "name": "non-owner cannot open an owner lead page",
+    "steps": [
+      {
+        "send": { "callback": "lead:list:0" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "Owner access isn't set up yet." } }]
       }
     ]
   }
